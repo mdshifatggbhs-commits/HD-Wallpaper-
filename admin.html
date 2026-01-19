@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; text-align: center; background: #fff; }
+        .upload-box { max-width: 400px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; }
+        input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        button { background: #2e7d32; color: #fff; border: none; cursor: pointer; font-weight: bold; }
+        .admin-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 30px; }
+        .admin-card { position: relative; border: 1px solid #eee; }
+        .admin-card img { width: 100%; height: 80px; object-fit: cover; }
+        .del-btn { position: absolute; top: 0; right: 0; background: red; color: white; border: none; padding: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="loginBox">
+        <input type="password" id="pass" placeholder="Password">
+        <button onclick="login()">Login</button>
+    </div>
+
+    <div id="adminPanel" style="display:none;">
+        <div class="upload-box">
+            <h3>Upload Wallpaper</h3>
+            <input type="file" id="imageInput">
+            <button onclick="uploadImage()">Upload</button>
+        </div>
+        <h3>Manage Uploads (Delete)</h3>
+        <div id="adminList" class="admin-gallery"></div>
+    </div>
+
+    <script>
+        const firebaseConfig = { /* আপনার Config */ };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function login() {
+            if(document.getElementById('pass').value === "1234") {
+                document.getElementById('loginBox').style.display = "none";
+                document.getElementById('adminPanel').style.display = "block";
+                loadPics();
+            }
+        }
+
+        async function uploadImage() {
+            const file = document.getElementById('imageInput').files[0];
+            if(!file) return alert("Select a file");
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', "nature_preset");
+
+            const res = await fetch(`https://api.cloudinary.com/v1_1/duu4w478s/image/upload`, { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if(data.secure_url) {
+                await db.collection("wallpapers").add({ url: data.secure_url, createdAt: new Date() });
+                alert("Uploaded!");
+            }
+        }
+
+        function loadPics() {
+            db.collection("wallpapers").orderBy("createdAt", "desc").onSnapshot(snap => {
+                const list = document.getElementById('adminList');
+                list.innerHTML = "";
+                snap.forEach(doc => {
+                    list.innerHTML += `
+                        <div class="admin-card">
+                            <img src="${doc.data().url}">
+                            <button class="del-btn" onclick="deletePic('${doc.id}')">X</button>
+                        </div>`;
+                });
+            });
+        }
+
+        async function deletePic(id) {
+            if(confirm("Delete this?")) {
+                await db.collection("wallpapers").doc(id).delete();
+            }
+        }
+    </script>
+</body>
+</html>
